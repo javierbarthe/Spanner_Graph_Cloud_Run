@@ -1,5 +1,5 @@
 To Build:
-gcloud builds submit --tag gcr.io/my-first-project-424319/shortest-path .
+gcloud builds submit --tag [image name] .
 
 To Run:
 gcloud run deploy shortest-path \
