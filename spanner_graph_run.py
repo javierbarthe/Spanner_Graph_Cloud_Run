@@ -42,22 +42,48 @@ def run_graph_query():
         logger.log_text(error_message, severity="ERROR")
         return jsonify({"error": error_message}), 400
 
-    gql_query = """
-        Graph INVENTARIO2
-        MATCH
-        p = ANY SHORTEST (
-        (src:NODO {{NODEID: {start_node}}})-[s:SEGMENTO | REVERSE_SEGMENTO]->{{1, 20}}(dest:NODO {{NODEID: {end_node}}})
-        )
-        LET es = EDGES(p)
-        FOR element in es
-        RETURN element.STARTNODEID, element.SEGMENTID, element.ENDNODEID
-    """.format(start_node=start_node_id, end_node=end_node_id)
-
-    outputs = []
     try:
+        # First query to get the path length
+        path_length_query = """
+            Graph INVENTARIO2
+            MATCH
+            ANY SHORTEST (
+            (src:NODO {{NODEID: {start_node}}})-[s:SEGMENTO | REVERSE_SEGMENTO]->{{1, 100}}(dest:NODO {{NODEID: {end_node}}})
+            )
+            LET path_length = COUNT(s)
+            RETURN  path_length
+        """.format(start_node=start_node_id, end_node=end_node_id)
+
+        path_length = 0
+        with database.snapshot() as snapshot:
+            results = snapshot.execute_sql(path_length_query)
+            for row in results:
+                path_length = row[0]
+                break  # We only expect one row
+
+        if path_length == 0:
+            error_message = "No path found between the specified nodes."
+            logger.log_text(error_message, severity="WARNING")
+            return jsonify({"message": error_message, "path_length": 0}), 200
+
+        # Main query using the dynamic path length
+        gql_query = """
+            Graph INVENTARIO2
+            MATCH
+            p = ANY SHORTEST (
+            (src:NODO {{NODEID: {start_node}}})-[s:SEGMENTO | REVERSE_SEGMENTO]->{{1, {path_length}}}(dest:NODO {{NODEID: {end_node}}})
+            )
+            LET es = EDGES(p)
+            FOR element in es
+            RETURN element.STARTNODEID, element.SEGMENTID, element.ENDNODEID
+        """.format(start_node=start_node_id, end_node=end_node_id, path_length=path_length)
+
+        outputs = []
         with database.snapshot() as snapshot:
             results = snapshot.execute_sql(gql_query)
             for row in results:
+                # The order of keys is explicitly set to STARTNODEID, SEGMENTID, ENDNODEID
+                # as per the GQL query's RETURN statement.
                 output = {
                     "STARTNODEID": row[0],
                     "SEGMENTID": row[1],
