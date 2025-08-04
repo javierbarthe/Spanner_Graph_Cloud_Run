@@ -10,8 +10,12 @@ COPY requirements.txt .
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Add a build argument for the application file
+ARG APP_FILE=spanner_graph_run_DQ.py
+ENV APP_FILE=${APP_FILE}
+
 # Copy the content of the local src directory to the working directory
-COPY spanner_graph_run.py .
+COPY ${APP_FILE} .
 
 # Make port 8080 available to the world outside this container
 EXPOSE 8080
@@ -20,4 +24,4 @@ EXPOSE 8080
 ENV PORT 8080
 
 # Run app.py when the container launches
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--timeout", "0", "spanner_graph_run:app"]
+CMD ["/bin/sh", "-c", "exec gunicorn --bind 0.0.0.0:8080 --timeout 0 ${APP_FILE%.py}:app"]

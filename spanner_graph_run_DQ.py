@@ -6,7 +6,7 @@ import google.cloud.logging
 
 # Initialize Flask app
 app = Flask(__name__)
-
+app.json.sort_keys = False
 # Initialize Google Cloud Logging
 logging_client = google.cloud.logging.Client()
 log_name = "spanner-graph-run"
